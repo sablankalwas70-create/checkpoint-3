@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>School Attendance System</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header>
+        <h1>School Attendance System</h1>
+        <p>Student Early Warning System</p>
+    </header>
+
+
+    <nav>
+        <a href="#students">Students</a>
+        <a href="#attendance">Attendance</a>
+        <a href="#warnings">Warnings</a>
+    </nav>
+
+
+    <main>
+
+        <!-- STUDENTS -->
+        <section id="students">
+
+            <h2>Student Management</h2>
+
+            <form id="studentForm">
+
+                <input type="text" id="studentID" placeholder="Student ID" required>
+
+                <input type="text" id="studentName" placeholder="Student Name" required>
+
+                <input type="email" id="studentEmail" placeholder="Email" required>
+
+                <input type="text" id="classID" placeholder="Class" required>
+
+                <button type="submit">Add Student</button>
+
+            </form>
+
+
+            <h3>Students</h3>
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Class</th>
+                        <th>Attendance</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+
+                <!-- Filled in by AttendanceController -->
+                <tbody id="studentList"></tbody>
+
+            </table>
+
+        </section>
+
+
+        <!-- ATTENDANCE -->
+        <section id="attendance">
+
+            <h2>Record Attendance</h2>
+
+            <form id="attendanceForm">
+
+                <label for="attendanceStudent">Student</label>
+
+                <select id="attendanceStudent" required>
+                    <option value="">Select Student</option>
+                </select>
+
+
+                <label for="date">Date</label>
+
+                <input type="date" id="date" required>
+
+
+                <label>Status</label>
+
+                <div class="status-options">
+
+                    <label>
+                        <input type="radio" name="status" value="Present" required>
+                        Present
+                    </label>
+
+                    <label>
+                        <input type="radio" name="status" value="Absent">
+                        Absent
+                    </label>
+
+                </div>
+
+
+                <button type="submit">Record Attendance</button>
+
+            </form>
+
+        </section>
+
+
+        <!-- WARNINGS -->
+        <section id="warnings">
+
+            <h2>Early Warnings</h2>
+
+            <!-- Filled in by AttendanceController -->
+            <div id="warningList">
+                <p class="no-warnings">No warnings.</p>
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <footer>
+        <p>School Attendance System</p>
+    </footer>
+
+
+    <!-- Scripts (order matters: models, then service, then controller, then app) -->
+    <script src="model.js"></script>
+    <script src="service.js"></script>
+    <script src="validator.js"></script>
+    <script src="storage.js"></script>
+    <script src="controller.js"></script>
+    <script src="app.js"></script>
+
+</body>
+
+</html>

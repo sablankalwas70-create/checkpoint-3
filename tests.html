@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Unit Tests</title>
+<style>
+  body { font-family: sans-serif; max-width: 700px; margin: 2rem auto; }
+  .pass { color: #1a7f37; } .fail { color: #c62828; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Unit Tests</h1>
+<p id="summary"></p>
+<ul id="results"></ul>
+
+<script src="model.js"></script>
+<script src="service.js"></script>
+<script src="validator.js"></script>
+<script src="storage.js"></script>
+<script>
+// ---- Tiny test framework ----
+let passed = 0, failed = 0;
+
+function test(name, fn) {
+    const li = document.createElement("li");
+    try {
+        fn();
+        passed++;
+        li.className = "pass";
+        li.textContent = "PASS: " + name;
+    } catch (e) {
+        failed++;
+        li.className = "fail";
+        li.textContent = "FAIL: " + name + " -> " + e.message;
+    }
+    document.getElementById("results").appendChild(li);
+}
+
+function assertEqual(actual, expected) {
+    if (actual !== expected) {
+        throw new Error(`expected ${expected}, got ${actual}`);
+    }
+}
+
+// Helper: build a student with a list of statuses (one per day)
+function makeStudent(statuses) {
+    const s = new Student("S001", "Ana Lee", "ana@x.com", "10A");
+    statuses.forEach((st, i) =>
+        s.addAttendance(new AttendanceRecord("R" + i, "S001", "10A",
+            "2024-01-" + String(i + 1).padStart(2, "0"), st)));
+    return s;
+}
+
+// ---- Validator ----
+test("valid student passes", () => {
+    const r = Validator.validateStudent(
+        { studentID: "S001", name: "Ana Lee", email: "ana@x.com", classID: "10A" });
+    assertEqual(r.valid, true);
+});
+
+test("bad email is rejected with a message", () => {
+    const r = Validator.validateStudent(
+        { studentID: "S001", name: "Ana Lee", email: "ana@", classID: "10A" });
+    assertEqual(r.valid, false);
+    assertEqual(r.errors.length, 1);
+});
+
+test("name with digits is rejected", () => {
+    const r = Validator.validateStudent(
+        { studentID: "S001", name: "Ana99", email: "a@b.com", classID: "10A" });
+    assertEqual(r.valid, false);
+});
+
+test("ID with spaces/symbols is rejected", () => {
+    const r = Validator.validateStudent(
+        { studentID: "S 1!", name: "Ana Lee", email: "a@b.com", classID: "10A" });
+    assertEqual(r.valid, false);
+});
+
+test("impossible date 2024-02-31 is rejected", () => {
+    assertEqual(Validator.validateDate("2024-02-31").valid, false);
+});
+
+test("future date is rejected", () => {
+    assertEqual(Validator.validateDate("2999-01-01").valid, false);
+});
+
+test("past real date is accepted", () => {
+    assertEqual(Validator.validateDate("2024-02-29").valid, true);
+});
+
+// ---- Student ----
+test("attendance percentage is calculated", () => {
+    assertEqual(makeStudent(["Present", "Absent", "Present", "Present"])
+        .calculateAttendancePercentage(), 75);
+});
+
+test("no records gives 'No Data' status", () => {
+    assertEqual(makeStudent([]).getWarningStatus(75), "No Data");
+});
+
+test("below threshold gives Warning, at threshold gives Good", () => {
+    assertEqual(makeStudent(["Present", "Absent"]).getWarningStatus(75), "Warning");
+    assertEqual(makeStudent(["Present", "Present", "Present", "Absent"])
+        .getWarningStatus(75), "Good");
+});
+
+test("duplicate date is detected", () => {
+    assertEqual(makeStudent(["Present"]).hasRecordForDate("2024-01-01"), true);
+    assertEqual(makeStudent(["Present"]).hasRecordForDate("2024-01-02"), false);
+});
+
+// ---- JSON ----
+test("JSON.stringify / JSON.parse round trip keeps records", () => {
+    const original = makeStudent(["Present", "Absent"]);
+    const copy = Student.fromJSON(JSON.parse(JSON.stringify(original)));
+    assertEqual(copy.name, "Ana Lee");
+    assertEqual(copy.attendanceRecords.length, 2);
+    assertEqual(copy.calculateAttendancePercentage(), 50);
+});
+
+test("fromJSON throws on malformed data", () => {
+    let threw = false;
+    try { Student.fromJSON(null); } catch (e) { threw = true; }
+    assertEqual(threw, true);
+});
+
+test("AttendanceRecord.fromJSON rejects bad status", () => {
+    let threw = false;
+    try {
+        AttendanceRecord.fromJSON({ status: "Late", date: "2024-01-01" });
+    } catch (e) { threw = true; }
+    assertEqual(threw, true);
+});
+
+// ---- StorageService (uses a separate key so real data is untouched) ----
+const TEST_KEY = "attendanceSystem.test";
+
+test("StorageService saves and loads students", () => {
+    StorageService.save([makeStudent(["Present", "Absent"])], TEST_KEY);
+    const loaded = StorageService.load(TEST_KEY);
+    assertEqual(loaded.length, 1);
+    assertEqual(loaded[0].attendanceRecords.length, 2);
+    StorageService.clear(TEST_KEY);
+});
+
+test("StorageService returns [] for corrupted JSON instead of crashing", () => {
+    localStorage.setItem(TEST_KEY, "{not valid json");
+    assertEqual(StorageService.load(TEST_KEY).length, 0);
+    assertEqual(StorageService.lastError !== null, true);
+    StorageService.clear(TEST_KEY);
+});
+
+// ---- AttendanceManager ----
+test("warning threshold setter ignores values outside 0-100", () => {
+    AttendanceManager.instance = undefined;   // fresh singleton for the test
+    const m = new AttendanceManager();
+    m.warningThreshold = 60;
+    m.warningThreshold = 150;
+    assertEqual(m.warningThreshold, 60);
+});
+
+test("manager calculates percentage and warning per student", () => {
+    AttendanceManager.instance = undefined;
+    const m = new AttendanceManager();
+    m.addRecord(new AttendanceRecord("1", "S9", "A", "2024-01-01", "Present"));
+    m.addRecord(new AttendanceRecord("2", "S9", "A", "2024-01-02", "Absent"));
+    assertEqual(m.calculatePercentage("S9"), 50);
+    assertEqual(m.checkWarning("S9"), true);
+});
+
+document.getElementById("summary").textContent =
+    `${passed} passed, ${failed} failed`;
+</script>
+</body>
+</html>
